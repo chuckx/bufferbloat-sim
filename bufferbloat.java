@@ -6,7 +6,9 @@ int maxPackets = 10;
 
 Host host1;
 Host host2;
-Packet[] packets;
+Stream stream1;
+
+// Processing.js functions
 
 void setup() {
     // size of canvas
@@ -17,13 +19,7 @@ void setup() {
     host1 = new Host(width/6,height/2,hs);
     host2 = new Host(width/6*5,height/2,hs);
 
-    packets = new Packet[10];
-
-    packets[0] = new Packet(ps,rate,#0000ff,2);
-    packets[1] = new Packet(ps,rate,#ffcc00,2);
-
-    packets[0].setPath(width/6+hs/2,height/2,width/6*5-hs/2,height/2);
-    packets[1].setPath(width/6*5-hs/2,height/2,width/6+hs/2,height/2);
+    stream1 = new Stream(20);
 }
 
 void draw() {
@@ -34,9 +30,11 @@ void draw() {
 
     line(width/6,height/2,width/6*5,height/2);
 
-    packets[0].display();
-    packets[1].display();
+    stream1.display();
 }
+
+
+// class definitions
 
 class Host {
     float xpos;
@@ -83,11 +81,11 @@ class Packet {
         color = _color;
     }
 
-    void setPath(float x1, float y1, float x2, float y2) {
-        xStart = x1;
-        yStart = y1;
-        xEnd = x2;
-        yEnd = y2;
+    void setPath(float _xStart, float _yStart, float _xEnd, float _yEnd) {
+        xStart = _xStart;
+        yStart = _yStart;
+        xEnd = _xEnd;
+        yEnd = _yEnd;
 
         xpos = xStart;
         ypos = yStart;
@@ -114,8 +112,7 @@ class Packet {
                 delta = delta + rate;
                 if (delta > end) {
                     delta = start;
-                    timer--;
-                }
+                    timer--; }
             } else {
                 delta = delta - rate;
                 if (delta < end) {
@@ -126,5 +123,62 @@ class Packet {
         }
 
         return delta;
+    }
+}
+
+class Stream {
+    Packet[] packets;
+    int maxPackets;
+    int packetCount;
+    int timer;
+    boolean pause;
+
+    float startx;
+    float starty;
+    float endx;
+    float endy;
+
+    Stream (int _maxPackets) {
+        maxPackets = _maxPackets;
+        packetCount = 0;
+        timer = 0;
+        puase = false;
+        packets = new Packet[maxPackets];
+    }
+
+    void setPath(float _xStart, float _yStart, float _xEnd, float _yEnd) {
+        xStart = _xStart;
+        yStart = _yStart;
+        xEnd = _xEnd;
+        yEnd = _yEnd;
+    }
+
+    void togglePause() {
+        if (pause == true) {
+            pause = false;
+        } else {
+            pause = true;
+        }
+    }
+
+    void addPacket() {
+        if (packetCount < maxPackets) {
+            packets[packetCount] = new Packet(ps,rate,#0000ff,1);
+            packets[packetCount].setPath(width/6+hs/2,height/2,width/6*5-hs/2,height/2);
+            packetCount++;
+        }
+    }
+
+    void display() {
+        for (i = 0; i < packetCount; i++) {
+            packets[i].display();
+        }
+
+        if (pause == false) {
+            timer++;
+            if (timer % 5 == 0) {
+                addPacket();
+            }
+        }
     }
 }
