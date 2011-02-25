@@ -241,10 +241,10 @@ class Transaction {
         packetsTransmitted = 0;
 
         transmit = new Stream(maxPackets);
-        transmit.setColor(#0000ff);
+        transmit.setColor(#00ff00);
 
         receive = new Stream(maxPackets);
-        receive.setColor(#00ff00);
+        receive.setColor(#0000ff);
         receive.toggleTimer();
     }
 
