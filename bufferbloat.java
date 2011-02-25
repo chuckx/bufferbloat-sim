@@ -1,5 +1,5 @@
 float x,y;
-float s = 100.0;
+float hs = 100.0;
 float ps = 20;
 float rate = 5;
 int maxPackets = 10;
@@ -10,24 +10,24 @@ Packet[] packets;
 
 void setup() {
     // size of canvas
-    size(600,400);
+    size(800,400);
     noStroke();
     frameRate(30);
 
-    host1 = new Host(width/6,height/2,s);
-    host2 = new Host(width/6*5,height/2,s);
+    host1 = new Host(width/6,height/2,hs);
+    host2 = new Host(width/6*5,height/2,hs);
 
     packets = new Packet[10];
 
-    packets[0] = new Packet(ps,rate,#0000ff);
-    packets[1] = new Packet(ps,rate,#ffcc00);
+    packets[0] = new Packet(ps,rate,#0000ff,2);
+    packets[1] = new Packet(ps,rate,#ffcc00,2);
 
-    packets[0].setPath(width/6+s/2,height/2,width/6*5-s/2,height/2);
-    packets[1].setPath(width/6*5-s/2,height/2,width/6+s/2,height/2);
+    packets[0].setPath(width/6+hs/2,height/2,width/6*5-hs/2,height/2);
+    packets[1].setPath(width/6*5-hs/2,height/2,width/6+hs/2,height/2);
 }
 
 void draw() {
-    background(150);
+    background(#222222);
 
     host1.display();
     host2.display();
@@ -60,10 +60,8 @@ class Host {
 class Packet {
     private float size;
     private float rate;
-    int color;
-
-    private float xt;
-    private float yt; 
+    private int color;
+    private int timer = -1;
 
     private float xpos;
     private float ypos;
@@ -72,13 +70,17 @@ class Packet {
     private float xEnd;
     private float yEnd;
 
-    Packet(float s, float r, int c) {
-        size = s;
-        rate = r;
-        color = c;
+    Packet(float _size, float _rate, int _color, int _timer) {
+        size = _size;
+        rate = _rate;
+        color = _color;
+        timer = _timer;
+    }
 
-        xt = 0;
-        yt = 0;
+    Packet(float _size, float _rate, int _color) {
+        size = _size;
+        rate = _rate;
+        color = _color;
     }
 
     void setPath(float x1, float y1, float x2, float y2) {
@@ -92,30 +94,33 @@ class Packet {
     }
 
     void display() {
-        // defines rate at which the packet animates
-        xt = getDelta(xt,xStart,xEnd);
-        yt = getDelta(yt,yStart,yEnd);
-   
-        console.log(xEnd + "," + yEnd + "," + xt + "," + yt);
-        translate(xt,yt);
+        if (timer != 0) {
+            //console.log(xpos + "," + ypos);
 
-        fill(color);
-        ellipse(xpos,ypos,size,size);
+            fill(color);
+            ellipse(xpos,ypos,size,size);
+
+            // defines rate at which the packet animates
+            xpos = getDelta(xpos,xStart,xEnd);
+            ypos = getDelta(ypos,yStart,yEnd);
+        }
     }
 
     private float getDelta(float delta, float start, float end) {
         if (start == end) {
-            delta = 0;
+            delta = start;
         } else {
             if (start < end) {
                 delta = delta + rate;
-                if (delta > (end - start)) {
-                    delta = 0;
+                if (delta > end) {
+                    delta = start;
+                    timer--;
                 }
             } else {
                 delta = delta - rate;
-                if (delta < (end - start)) {
-                    delta = 0;
+                if (delta < end) {
+                    delta = start;
+                    timer--;
                 }
             }
         }
