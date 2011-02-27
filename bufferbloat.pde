@@ -12,7 +12,7 @@ Transaction transaction1;
 
 void setup() {
     // size of canvas
-    size(800,400);
+    size(800,200);
     noStroke();
     frameRate(30);
 
@@ -21,6 +21,7 @@ void setup() {
 
     transaction1 = new Transaction(maxPackets);
     transaction1.setPath(width/6+hs/2,height/2,width/6*5-hs/2,height/2);
+    transaction1.setPause(true);
 }
 
 void draw() {
@@ -177,20 +178,12 @@ class Stream {
         yEnd = _yEnd;
     }
 
-    void toggleTimer() {
-        if (useTimer == true) {
-            useTimer = false;
-        } else {
-            useTimer = true;
-        }
+    void setTimer(boolean status) {
+        useTimer = status;
     }
 
-    void togglePause() {
-        if (pause == true) {
-            pause = false;
-        } else {
-            pause = true;
-        }
+    void setPause(boolean status) {
+        pause = status;
     }
 
     void addPacket() {
@@ -228,6 +221,7 @@ class Stream {
 class Transaction {
     int maxPackets;
     int packetsTransmitted;
+    boolean pause;
     Stream transmit;
     Stream receive;
 
@@ -245,7 +239,7 @@ class Transaction {
 
         receive = new Stream(maxPackets);
         receive.setColor(#0000ff);
-        receive.toggleTimer();
+        receive.setTimer(false);
     }
 
     void setPath(float _xStart, float _yStart, float _xEnd, float _yEnd) {
@@ -256,6 +250,11 @@ class Transaction {
 
         transmit.setPath(xStart,yStart,xEnd,yEnd);
         receive.setPath(xEnd,yEnd,xStart,yStart);
+    }
+
+    void setPause(boolean status) {
+        transmit.setPause(status);
+        receive.setPause(status);
     }
 
     void display() {
