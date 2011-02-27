@@ -4,17 +4,31 @@
 <html>
 
 <head>
-<title>Buffer Bloat Animation Proof of Concept</title>
+<title>Buffer Bloat Simulation</title>
 <script type="text/javascript" src="./jquery.js"></script>
 <script type="text/javascript" src="./bufferbloat.js"></script>
 </head>
 
 <body>
 
-<h1>Buffer Bloat Animation Proof of Concept</h1>
+<h1>Buffer Bloat Simulation</h1>
 
 <hr />
 
+<table>
+<tr>
+<td>Packets per transmission:</td>
+<td><input id="maxpackets" type="text" value="20" /></td>
+</tr>
+
+<tr>
+<td>Buffer size:</td>
+<td><input id="buffersize" type="text" value="not implemented yet" /></td>
+</tr>
+
+</table>
+
+<br />
 <input id="start" type="submit" value="Start a transmission" />
 
 <hr />
