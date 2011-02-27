@@ -1,7 +1,12 @@
 // Buffer Bloat Simulation
 
+/* TODO
+ - track "latency", measured in simulation ticks
+ - implement intermediate node
+*/
+
 // canvas settings
-var width = 800;
+var width = 600;
 var height = 200;
 
 // number of packets in a transmission
@@ -29,10 +34,17 @@ $(document).ready(function () {
     simulation.setPause(true);
 
     $("#start").click(function() {
-        if (simulation.done == true) {
-            simulation.restart();
-            $(this).attr("value","Pause");
+        if (simulation.done == false) {
+            simulation.setPause(false);
         } else {
+            simulation.restart();
+        }
+        $(this).attr("disabled",true);
+        $("#pause").attr("disabled",false).attr("value","Pause");
+    });
+
+    $("#pause").click(function() {
+        if (simulation.done == false) {
             if (simulation.pause == true) {
                 simulation.setPause(false);
                 $(this).attr("value","Pause");
@@ -45,14 +57,15 @@ $(document).ready(function () {
 
     (function renderLoop() {
         // clear canvas
-        context.fillStyle = "#ffffff";
+        context.fillStyle = "#eeeeee";
         context.fillRect(0,0,width,height);
 
         // draw current simulation
         simulation.display(context);
 
         if (simulation.done == true) {
-            $("#start").attr("value","Start a transmission");
+            $("#start").attr("value","Start a transmission").attr("disabled",false);
+            $("#pause").attr("value","Pause").attr("disabled",true);
         }   
 
         // loop
@@ -132,7 +145,9 @@ function Host(label,x,y,size) {
 }
 
 Host.prototype.display = function(canvas) {
+    canvas.fillStyle = "#ffffff";
     canvas.strokeRect(this.x,this.y,this.size,this.size);
+    canvas.fillRect(this.x,this.y,this.size,this.size);
 
     canvas.textBaseline = "top";
     canvas.strokeText(this.label,this.labelx,this.labely);
@@ -156,6 +171,7 @@ Packet.prototype.setPath = function(xStart,yStart,xEnd,yEnd) {
     this.x = this.xStart;
     this.y = this.yStart;
 
+    // calculate animation increments
     var dx = this.xEnd - this.xStart;
     var dy = this.yEnd - this.yStart;
     this.numPoints = Math.floor(Math.sqrt(dx*dx + dy*dy) / packetrate) - 1;
