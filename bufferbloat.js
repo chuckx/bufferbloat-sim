@@ -1,27 +1,41 @@
 // Buffer Bloat Simulation
 
 /* TODO
+ - implement error checking from web page input
  - track "latency", measured in simulation ticks
  - implement intermediate node
 */
 
 // canvas settings
 var width = 600;
-var height = 200;
-
-// number of packets in a transmission
-var maxPackets;
+var height = 400;
 
 // packet settings
 
 var packetsize = 15;
 var packetrate = 10;
 
+
+// variables defined via web page settings
+
+// number of packets in a transmission
+var maxPackets;
+
+// size of client buffer
+var clientBufferSize;
+
+
 $(document).ready(function () {
     maxPackets = $("#maxpackets").val();
 
     $("#maxpackets").change(function() {
         maxPackets = $(this).val();
+    });
+
+    clientBufferSize = $("#clientbuffersize").val();
+
+    $("#clientbuffersize").change(function() {
+        clientBufferSize = $(this).val();
     });
 
     var canvas = document.getElementById("bb");
@@ -85,16 +99,20 @@ Simulation.prototype.start = function() {
     // calculate positions of simulation elements
     var hostSize = 100;
     var host1x = width/6 - hostSize/2;
-    var host1y = height/2 - hostSize/2;
+    var host1y = height/4 - hostSize/2;
     var host2x = width/6*5 - hostSize/2;
-    var host2y = height/2 - hostSize/2;
+    var host2y = height/4 - hostSize/2;
     this.xStart = width/6 + hostSize/2;
-    this.yStart = height/2;
+    this.yStart = height/4;
     this.xEnd = width/6*5 - hostSize/2;
-    this.yEnd = height/2;
+    this.yEnd = height/4;
 
-    this.host1 = new Host("Client",host1x,host1y,hostSize);
-    this.host2 = new Host("Server",host2x,host2y,hostSize);
+    this.client = new Host("Client",host1x,host1y,hostSize);
+    if (clientBufferSize > 0) {
+        this.client.attachBuffer(clientBufferSize);
+    }
+
+    this.server = new Host("Server",host2x,host2y,hostSize);
 
     this.transaction1 = new Transaction(maxPackets);
     this.transaction1.setPath(this.xStart,this.yStart,this.xEnd,this.yEnd);
@@ -102,8 +120,8 @@ Simulation.prototype.start = function() {
 }
 
 Simulation.prototype.restart = function() {
-    delete this.host1;
-    delete this.host2;
+    delete this.client;
+    delete this.server;
     delete this.transactions1;
 
     this.start();
@@ -116,8 +134,8 @@ Simulation.prototype.setPause = function(state) {
 }
 
 Simulation.prototype.display = function(canvas) {
-    this.host1.display(canvas);
-    this.host2.display(canvas);
+    this.client.display(canvas);
+    this.server.display(canvas);
 
     // draw connection between hosts
     canvas.beginPath();
@@ -144,6 +162,13 @@ function Host(label,x,y,size) {
     this.labely = this.y + 10;
 }
 
+Host.prototype.attachBuffer = function(bufferSize) {
+    // calculate position for buffer
+    var x = this.x + this.size/9;
+    var y = this.y + this.size + 5;
+    this.buffer = new Buffer(x,y,bufferSize);
+}
+
 Host.prototype.display = function(canvas) {
     canvas.fillStyle = "#ffffff";
     canvas.strokeRect(this.x,this.y,this.size,this.size);
@@ -151,6 +176,10 @@ Host.prototype.display = function(canvas) {
 
     canvas.textBaseline = "top";
     canvas.strokeText(this.label,this.labelx,this.labely);
+
+    if (this.buffer !== undefined) {
+        this.buffer.display(canvas);
+    }
 }
 
 
@@ -331,4 +360,117 @@ Transaction.prototype.display = function(canvas) {
     if (this.receive.packetsDone == maxPackets) {
         this.done = true;
     }
+}
+
+function Buffer(x,y,size) {
+    this.x = x;
+    this.y = y;
+    this.width = 80;
+    this.height = 200;
+    this.size = size;
+
+    this.rows = 10;
+    this.columns = Math.floor(this.size / this.rows);
+    this.blankGrid = 0;
+    if (this.size % this.rows > 0) {
+        this.blankGrid = this.rows - (this.size % this.rows);
+        this.columns += 1;
+    }
+    console.log(this.columns + "," + this.blankGrid);
+
+    this.vStep = this.height/this.rows;
+    this.hStep = this.width/this.columns;
+
+    // create an array of grid positions
+    this.grid = new Array(this.size);
+
+    var columnOffset = 0;
+    if (this.size & this.rows > 0) {
+        // starting position
+        this.grid[0] = {
+            x: this.x,
+            y: this.y+(this.height-(this.blankGrid*this.vStep+this.vStep))
+        }
+
+        // remainder of first column
+        var l = this.grid.length;
+        for (var i=l; i<(this.rows-this.blankGrid); i++) {
+            var previous = i-1;
+            this.grid[i] = {
+                x: this.x,
+                y: this.grid[previous].y - this.vStep
+            }
+        }
+        columnOffset = 1;
+    }
+
+    // remainder of the grid
+    var arrayOffset = this.grid.length;
+    for (var i=0; i< (this.size-(this.rows-this.blankGrid)) ;i++) {
+        var column = Math.floor(i / this.rows) + columnOffset;
+        var row = this.rows - (Math.floor(i % this.rows));
+        this.grid[i+arrayOffset] = {
+            x: this.x + column*this.hStep, 
+            y: this.y + row*this.vStep - this.vStep
+        }
+    }
+
+    this.maxPackets = maxPackets;
+    this.packetCount = 0;
+    this.packets = [];
+}
+
+Buffer.prototype.addPacket = function() {
+    if (this.packets.length < this.maxPackets) {
+        this.packets[packetCount] = {
+            x: this.xStart,
+            y: this.yStart
+        };
+        packetCount++;
+    }
+}
+
+Buffer.prototype.stepPackets = function() {
+
+}
+
+Buffer.prototype.display = function(canvas) {
+    canvas.fillStyle = "#ffffff";
+    canvas.strokeRect(this.x,this.y,this.width,this.height);
+    canvas.strokeText("Buffer",this.x,this.y+this.height+5);
+
+    // draw grid
+    canvas.beginPath();
+    for (var i=1;i<this.rows;i++) {
+        canvas.moveTo(this.x,this.y+(i*this.vStep));
+        canvas.lineTo(this.x+this.width,this.y+(i*this.vStep));
+    }
+    for (var i=1;i<this.columns;i++) {
+        canvas.moveTo(this.x+(i*this.hStep),this.y);
+        canvas.lineTo(this.x+(i*this.hStep),this.y+this.height);
+    }
+    canvas.stroke();
+    canvas.closePath();
+
+    // fill in blank grid elements
+    if (this.blankGrid > 0) {
+        canvas.fillStyle = "#000000";
+        canvas.fillRect(
+            this.x,
+            this.y+(this.height-(this.blankGrid*this.vStep)),
+            this.hStep,
+            this.blankGrid*this.vStep
+        );
+    }
+
+    /*
+    // TEST - fill in grid elements
+    for (var i=0;i<this.grid.length;i++) {
+        canvas.globalAlpha = 0.9;
+        canvas.fillStyle = "#00ee00";
+        canvas.fillRect(this.grid[i].x,this.grid[i].y,this.hStep,this.vStep);
+    }
+    */
+
+    // draw packets currently in the buffer
 }
