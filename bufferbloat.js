@@ -1,6 +1,9 @@
 // Buffer Bloat Simulation
 
 /* TODO
+ - fix buffer sizes that aren't divisible by 10
+ - allow packets to be handed off from buffer to transmit stream
+   during pause state
  - implement error checking from web page input
  - track "latency", measured in simulation ticks
  - implement intermediate node
@@ -26,6 +29,8 @@ var clientBufferSize;
 
 
 $(document).ready(function () {
+
+    // retrieve values from web page inputs
     maxPackets = $("#maxpackets").val();
 
     $("#maxpackets").change(function() {
@@ -38,6 +43,8 @@ $(document).ready(function () {
         clientBufferSize = $(this).val();
     });
 
+
+    // prepare canvas
     var canvas = document.getElementById("bb");
     $("#bb").attr("width",width).attr("height",height);
 
@@ -47,8 +54,12 @@ $(document).ready(function () {
     simulation.start();
     simulation.setPause(true);
 
+
+    // prepare controls
     $("#start").click(function() {
         if (simulation.done == false) {
+            //restart to catch any change of settings
+            simulation.restart();
             simulation.setPause(false);
         } else {
             simulation.restart();
@@ -108,15 +119,16 @@ Simulation.prototype.start = function() {
     this.yEnd = height/4;
 
     this.client = new Host("Client",host1x,host1y,hostSize);
-    if (clientBufferSize > 0) {
-        this.client.attachBuffer(clientBufferSize);
-    }
-
     this.server = new Host("Server",host2x,host2y,hostSize);
 
     this.transaction1 = new Transaction(maxPackets);
     this.transaction1.setPath(this.xStart,this.yStart,this.xEnd,this.yEnd);
     //transaction1.setPause(true);
+
+    if (clientBufferSize > 0) {
+        this.client.attachBuffer(clientBufferSize);
+        this.transaction1.attachBuffer(this.client.buffer);
+    }
 }
 
 Simulation.prototype.restart = function() {
@@ -305,6 +317,7 @@ Stream.prototype.display = function(canvas) {
 
 function Transaction(maxPackets) {
     this.maxPackets = maxPackets;
+    this.pause = false;
     this.packetsTransmitted = 0;
 
     this.transmit = new Stream(maxPackets);
@@ -338,7 +351,17 @@ Transaction.prototype.setPath = function(xStart,yStart,xEnd,yEnd) {
     );
 }
 
+Transaction.prototype.attachBuffer = function(buffer) {
+    this.buffer = buffer;
+    this.transmit.setTimer(false);
+
+    this.packetsInBuffer = 0;
+    this.packetsThroughBuffer = 0;
+    this.timer = 0;
+}
+
 Transaction.prototype.setPause = function(state) {
+    this.pause = state;
     this.transmit.setPause(state);
     this.receive.setPause(state);
 }
@@ -346,6 +369,30 @@ Transaction.prototype.setPause = function(state) {
 Transaction.prototype.display = function(canvas) {
     this.transmit.display(canvas);
     this.receive.display(canvas);
+
+    if (this.buffer !== undefined) {
+        if (this.pause == false) {
+            if (this.timer % 5 == 0) {
+                if (this.packetsInBuffer < this.maxPackets) {
+                    
+                    this.buffer.addPacket();
+                    this.packetsInBuffer++;
+                }
+            }
+            this.timer++;
+
+            if (this.packetsThroughBuffer != this.buffer.packetsDone) {
+                var packetsToAdd = 
+                    this.buffer.packetsDone - this.packetsThroughBuffer;
+                for (var i=0; i < packetsToAdd; i++) {
+                    this.transmit.addPacket();
+                    this.packetsThroughBuffer++;
+                }
+            }
+        }
+
+        this.buffer.display(canvas);
+    }
 
     if (this.packetsTransmitted != this.transmit.packetsDone) {
         var packetsToAdd = this.transmit.packetsDone - this.packetsTransmitted;
@@ -387,26 +434,24 @@ function Buffer(x,y,size) {
     var columnOffset = 0;
     if (this.size & this.rows > 0) {
         // starting position
-        this.grid[0] = {
-            x: this.x,
-            y: this.y+(this.height-(this.blankGrid*this.vStep+this.vStep))
-        }
+        this.grid[0].x = this.x;
+        this.grid[0].y = 
+            this.y+(this.height-(this.blankGrid*this.vStep+this.vStep))
 
         // remainder of first column
         var l = this.grid.length;
         for (var i=l; i<(this.rows-this.blankGrid); i++) {
             var previous = i-1;
-            this.grid[i] = {
-                x: this.x,
-                y: this.grid[previous].y - this.vStep
-            }
+            this.grid[i] = {};
+            this.grid[i].x = this.x;
+            this.grid[i].y = this.grid[previous].y - this.vStep
         }
         columnOffset = 1;
     }
 
     // remainder of the grid
     var arrayOffset = this.grid.length;
-    for (var i=0; i< (this.size-(this.rows-this.blankGrid)) ;i++) {
+    for (var i=0; i < (this.size-this.blankGrid) ;i++) {
         var column = Math.floor(i / this.rows) + columnOffset;
         var row = this.rows - (Math.floor(i % this.rows));
         this.grid[i+arrayOffset] = {
@@ -417,21 +462,32 @@ function Buffer(x,y,size) {
 
     this.maxPackets = maxPackets;
     this.packetCount = 0;
-    this.packets = [];
+    this.packetsDone = 0;
+    this.packets = new Array();
 }
 
 Buffer.prototype.addPacket = function() {
-    if (this.packets.length < this.maxPackets) {
-        this.packets[packetCount] = {
-            x: this.xStart,
-            y: this.yStart
-        };
-        packetCount++;
+    if (this.packetCount < this.maxPackets) {
+        index = this.packets.length;
+        this.packets[index] = {};
+        this.packets[index].x = this.grid[1].x;
+        this.packets[index].y = this.grid[1].y;
+        this.packets[index].position = 1;
+        this.packetCount++;
     }
 }
 
 Buffer.prototype.stepPackets = function() {
-
+    for (var i=0; i < this.packets.length; i++) {
+        if (this.packets[i].position >= this.size) {
+            this.packets.shift();
+            this.packetsDone++;
+        } else {
+            this.packets[i].position++;
+            this.packets[i].x = this.grid[this.packets[i].position].x;
+            this.packets[i].y = this.grid[this.packets[i].position].y;
+        }
+    }
 }
 
 Buffer.prototype.display = function(canvas) {
@@ -473,4 +529,20 @@ Buffer.prototype.display = function(canvas) {
     */
 
     // draw packets currently in the buffer
+    if (this.packets.length > 0) {
+        for (var i=0; i<this.packets.length; i++) {
+            // make packets a bit smaller than the grid outline
+            var offset = 2;
+            canvas.fillStyle = "#00ee00";
+            canvas.fillRect(
+                this.packets[i].x+offset,
+                this.packets[i].y+offset,
+                this.hStep-offset,
+                this.vStep-offset
+            );
+        }
+    } 
+
+    // step packets to their next position
+    this.stepPackets();
 }
