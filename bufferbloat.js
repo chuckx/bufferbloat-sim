@@ -1,11 +1,10 @@
 // Buffer Bloat Simulation
 
 /* TODO
- - fix buffer sizes that aren't divisible by 10
  - allow packets to be handed off from buffer to transmit stream
    during pause state
  - implement error checking from web page input
- - track "latency", measured in simulation ticks
+ - track "latency", measured in simulation ticks (?)
  - implement intermediate node
 */
 
@@ -16,7 +15,7 @@ var height = 400;
 // packet settings
 
 var packetsize = 15;
-var packetrate = 10;
+var packetrate = 15;
 
 
 // variables defined via web page settings
@@ -57,13 +56,8 @@ $(document).ready(function () {
 
     // prepare controls
     $("#start").click(function() {
-        if (simulation.done == false) {
-            //restart to catch any change of settings
-            simulation.restart();
-            simulation.setPause(false);
-        } else {
-            simulation.restart();
-        }
+        simulation.restart(context);
+        simulation.setPause(false);
         $(this).attr("disabled",true);
         $("#pause").attr("disabled",false).attr("value","Pause");
     });
@@ -82,8 +76,7 @@ $(document).ready(function () {
 
     (function renderLoop() {
         // clear canvas
-        context.fillStyle = "#eeeeee";
-        context.fillRect(0,0,width,height);
+        simulation.clearDisplay(context);
 
         // draw current simulation
         simulation.display(context);
@@ -131,11 +124,12 @@ Simulation.prototype.start = function() {
     }
 }
 
-Simulation.prototype.restart = function() {
+Simulation.prototype.restart = function(canvas) {
     delete this.client;
     delete this.server;
     delete this.transactions1;
 
+    this.clearDisplay(canvas);
     this.start();
 }
 
@@ -162,6 +156,12 @@ Simulation.prototype.display = function(canvas) {
         this.done = true;
     }
 }
+
+Simulation.prototype.clearDisplay = function(canvas) {
+    canvas.fillStyle = "#eeeeee";
+    canvas.fillRect(0,0,width,height);
+}
+
 
 
 function Host(label,x,y,size) {
@@ -390,8 +390,6 @@ Transaction.prototype.display = function(canvas) {
                 }
             }
         }
-
-        this.buffer.display(canvas);
     }
 
     if (this.packetsTransmitted != this.transmit.packetsDone) {
@@ -423,17 +421,18 @@ function Buffer(x,y,size) {
         this.blankGrid = this.rows - (this.size % this.rows);
         this.columns += 1;
     }
-    console.log(this.columns + "," + this.blankGrid);
+    //console.log(this.columns + "," + this.blankGrid);
 
     this.vStep = this.height/this.rows;
     this.hStep = this.width/this.columns;
 
     // create an array of grid positions
-    this.grid = new Array(this.size);
+    this.grid = new Array();
 
     var columnOffset = 0;
-    if (this.size & this.rows > 0) {
+    if (this.size % this.rows > 0) {
         // starting position
+        this.grid[0] = {};
         this.grid[0].x = this.x;
         this.grid[0].y = 
             this.y+(this.height-(this.blankGrid*this.vStep+this.vStep))
@@ -470,8 +469,8 @@ Buffer.prototype.addPacket = function() {
     if (this.packetCount < this.maxPackets) {
         index = this.packets.length;
         this.packets[index] = {};
-        this.packets[index].x = this.grid[1].x;
-        this.packets[index].y = this.grid[1].y;
+        this.packets[index].x = this.grid[0].x;
+        this.packets[index].y = this.grid[0].y;
         this.packets[index].position = 1;
         this.packetCount++;
     }
@@ -483,9 +482,9 @@ Buffer.prototype.stepPackets = function() {
             this.packets.shift();
             this.packetsDone++;
         } else {
-            this.packets[i].position++;
             this.packets[i].x = this.grid[this.packets[i].position].x;
             this.packets[i].y = this.grid[this.packets[i].position].y;
+            this.packets[i].position++;
         }
     }
 }
